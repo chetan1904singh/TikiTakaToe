@@ -5,6 +5,7 @@ import Signup from "./pages/Signup";
 import Home from "./pages/Home";
 import Game from "./pages/Game";
 import Result from "./pages/Result";
+import Matchmaking from "./pages/matchmaking";
 
 function App() {
     return (
@@ -18,6 +19,8 @@ function App() {
             <Route path="/game" element={<Game />} />
 
             <Route path="/result" element={<Result />} />
+
+            <Route path="/matchmaking" element={<Matchmaking />} />
         </Routes>
     );
 }
