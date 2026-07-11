@@ -6,8 +6,6 @@ import userRoutes from "./routes/users.js";
 import http from "http";
 import { Server } from "socket.io";
 
-
-
 dotenv.config();
 
 const app = express();
@@ -15,7 +13,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+//routes
 app.use("/auth", userRoutes);
+//routes
+
 
 //socket io
 const server = http.createServer(app);
@@ -29,20 +30,28 @@ const io = new Server(server, {
 // all other socket events only after conn happens/inside it
 io.on("connection", (socket) => {
 
-    console.log(`User Connected with id ${socket.id}`);
-
-    //data=room
+    //**data=room
     socket.on("join_room",(data)=>{
+         
+        const checkData = io.sockets.adapter.rooms.get(data);
+        
+        if (checkData && checkData.size >= 2) {
+             socket.emit("room_full");
+             return;
+        }
         
         socket.join(data);
-        io.to(data).emit("joined_room",data);
         
-        console.log(`user ${socket.id} joined room ${data}`);
+        const roomData = io.sockets.adapter.rooms.get(data); //returns a set
+        
+        if(roomData.size===2){
+            io.to(data).emit("start_game");
+        }
+        
+        console.log(`there are ${roomData.size} users`);
     })
     
-
-
-    socket.on("disconnect",()=>{
+     socket.on("disconnect",()=>{
         console.log("User disconnected",socket.id);
     })
 
