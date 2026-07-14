@@ -14,8 +14,6 @@ function Home(){
     
     };
 
-    
-
     const handleLogout = () => {
         localStorage.removeItem("token");
         navigate("/");

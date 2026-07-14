@@ -1,8 +1,10 @@
-import { useNavigate } from "react-router-dom";
+import { useLocation ,useNavigate } from "react-router-dom";
 
 function Result() {
 
     const navigate = useNavigate();
+    const location = useLocation();
+    const winner=location.state;
 
     return (
         <div className="container">
@@ -14,14 +16,8 @@ function Result() {
                 <h2>Winner</h2>
 
                 <h1 style={{ color: "green" }}>
-                    Player X
+                    {winner}
                 </h1>
-
-                <button
-                    onClick={() => navigate("/game")}
-                >
-                    Play Again
-                </button>
 
                 <button
                     onClick={() => navigate("/home")}

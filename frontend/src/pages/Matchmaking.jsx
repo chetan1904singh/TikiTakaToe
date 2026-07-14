@@ -17,12 +17,12 @@ function Matchmaking(){
         navigate("/home");
      });
 
-    socket.on("start_game", () => {
-        navigate("/game");
+    socket.on("game_start", (game) => {
+         navigate("/game", {state: game});
     });
 
     return () => {
-        socket.off("start_game");
+        socket.off("game_start");
         socket.off("room_full");
     };
 
