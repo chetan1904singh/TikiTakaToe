@@ -14,7 +14,7 @@ function checkWinner(board) {
         [2,4,6]
 
     ];
-
+    
     for (const pattern of winPatterns) {
 
         const [a,b,c] = pattern;
@@ -23,6 +23,12 @@ function checkWinner(board) {
             return board[a];
         }
     }
+    //check for draw
+    let c=0;
+    for(let i=0;i<9;i++){
+          if(board[i])c++;
+    }
+    if(c==9)return 'Draw';
 
     return null;
 

@@ -6,11 +6,15 @@ import socket from "../services/socket";
 function Matchmaking(){
     const navigate = useNavigate();
     const location = useLocation();
-    const room = location.state.room;
+    const room = location.state?.room;
 
     useEffect(() => {
 
-    socket.emit("join_room", room);
+    if (room) {
+        socket.emit("join_room", room);
+    } else {
+        socket.emit("find_match");
+    }
 
     socket.on("room_full", () => {
         alert("Room is already full.");
@@ -18,6 +22,7 @@ function Matchmaking(){
      });
 
     socket.on("game_start", (game) => {
+        console.log("GAME START RECEIVED", game);
          navigate("/game", {state: game});
     });
 
@@ -31,17 +36,29 @@ function Matchmaking(){
   
    
 
-    return(
-        <div className="container">
+    return (
+    <div
+        className="min-h-screen flex items-center justify-center bg-cover bg-center"
+        style={{ backgroundImage: "url('/FrontWp.jpg')" }}>
 
-            <div className="card">
+        <div className="w-[400px] rounded-2xl bg-white/10 backdrop-blur-lg border border-white/20 shadow-2xl p-8 text-center">
 
-                <h1>Joining Room...</h1>
+            <h1 className="text-4xl font-bold text-black mb-6">
+                Joining Room...
+            </h1>
 
+            <div className="flex justify-center mb-6">
+                <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
             </div>
+
+            <p className="text-black/80 text-lg">
+                Waiting for another player...
+            </p>
+
         </div>
 
-    );
+    </div>
+);
 
 }
 

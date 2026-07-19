@@ -36,13 +36,27 @@ function Login() {
     };
 
     return (
-        <div className="container">
+    <div
+        className="min-h-screen flex items-center justify-center bg-cover bg-center"
+        style={{ backgroundImage: "url('/FrontWp.jpg')" }}
+    >
+        {/* Dark overlay */}
+        <div className="absolute inset-0 "></div>
 
-            <form className="form" onSubmit={handleSubmit}>
+        {/* Glass Card */}
+        <div className="relative w-[400px] rounded-3xl bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl p-8">
 
-                <h1>Login</h1>
+            <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
 
-                {error && <p className="error">{error}</p>}
+                <h1 className="text-4xl font-bold text-center text-white mb-2">
+                    Login
+                </h1>
+
+                {error && (
+                    <p className="text-red-300 text-center">
+                        {error}
+                    </p>
+                )}
 
                 <input
                     type="email"
@@ -51,6 +65,7 @@ function Login() {
                     value={formData.email}
                     onChange={handleChange}
                     required
+                    className="w-full rounded-xl bg-white/20 border border-white/30 px-4 py-3 text-white placeholder-gray-300 outline-none focus:border-green-400"
                 />
 
                 <input
@@ -60,15 +75,22 @@ function Login() {
                     value={formData.password}
                     onChange={handleChange}
                     required
+                    className="w-full rounded-xl bg-white/20 border border-white/30 px-4 py-3 text-white placeholder-gray-300 outline-none focus:border-green-400"
                 />
 
-                <button type="submit">
+                <button
+                    type="submit"
+                    className="w-full rounded-xl bg-green-500 py-3 text-lg font-semibold text-white transition hover:bg-green-600 hover:scale-105"
+                >
                     Login
                 </button>
 
-                <p>
+                <p className="text-center text-gray-200">
                     Don't have an account?{" "}
-                    <Link to="/signup">
+                    <Link
+                        to="/signup"
+                        className="font-semibold text-green-300 hover:text-green-200"
+                    >
                         Signup
                     </Link>
                 </p>
@@ -76,7 +98,8 @@ function Login() {
             </form>
 
         </div>
-    );
+    </div>
+);
 }
 
 export default Login;

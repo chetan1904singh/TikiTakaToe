@@ -7,20 +7,17 @@ import http from "http";
 import { Server } from "socket.io";
 
 import checkWinner from "./services/winnerCheck.js";
-
-
+import {createGame} from "./services/createGame.js";
 
 dotenv.config();
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
 //routes
 app.use("/auth", userRoutes);
 //routes
-
 
 //SOCKET IO
 const server = http.createServer(app);
@@ -30,7 +27,8 @@ const io = new Server(server, {
     },
 });
 
-const games = {};
+const games = {}; //to store board,turns and curr game
+const queue=[];
 //main connecton fn
 // all other socket events only after conn happens/inside it
 io.on("connection", (socket) => {
@@ -50,35 +48,17 @@ io.on("connection", (socket) => {
         const roomData = io.sockets.adapter.rooms.get(data); //returns a set
         
         if(roomData.size===2){
-      const players = [...roomData];
-
-            games[data] = {
-                board: Array(9).fill(""),
-                turn: "X",
-                players: [
-                    {socketId: players[0],symbol: "X"},
-                    {socketId: players[1],symbol: "O"}
-                ]
-            }
-       
-            // Tell Player X
-            io.to(players[0]).emit("game_start", {
-                room: data,
-                board: games[data].board,
-                turn: games[data].turn,
-                symbol: "X"
-            });
-
-            // Tell Player O
-            io.to(players[1]).emit("game_start", {
-                room: data,
-                board: games[data].board,
-                turn: games[data].turn,
-                symbol: "O"
-            });
-                
+          const players = [...roomData];
+            createGame(
+                io,
+                games,
+                data,
+                { id: players[0] },
+                { id: players[1] }
+            );
+            
         }
- 
+        
         console.log(`there are ${roomData.size} users`);
 })
 
@@ -107,19 +87,47 @@ io.on("connection", (socket) => {
         game.board[index] = game.turn;
         
         const winner=checkWinner(game.board);
+        
         if(winner!==null){
             io.to(room).emit("winner", winner);
         }
         
         else{
         game.turn = game.turn === "X" ? "O" : "X";
-
         io.to(room).emit("board_update", {
             board: game.board,
             turn: game.turn
 
         });
         }
+
+})
+
+
+//------------randomMatchmaking Logic---------------
+socket.on("find_match",()=>{
+    
+    queue.push(socket);
+    
+    if(queue.length>=2){
+        const player1 = queue.shift(); //socket objs
+        const player2 = queue.shift();
+        
+        const room = "room-" + Date.now();//create room
+         player1.join(room);
+         player2.join(room);    
+        
+         createGame(
+             io,
+             games,
+             room,
+             player1,
+             player2
+         );
+         console.log("match Found with random!");
+        
+    }
+    console.log(`${socket.id} searching for random`);
 
 })
     
