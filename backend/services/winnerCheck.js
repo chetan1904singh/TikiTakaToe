@@ -20,6 +20,7 @@ function checkWinner(board) {
         const [a,b,c] = pattern;
 
         if (board[a] && board[a] === board[b] && board[b] === board[c]) {
+            
             return board[a];
         }
     }
@@ -29,7 +30,7 @@ function checkWinner(board) {
           if(board[i])c++;
     }
     if(c==9)return 'Draw';
-
+    
     return null;
 
 }
