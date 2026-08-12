@@ -26,8 +26,12 @@ function Login() {
 
         try {
             const res = await api.post("/auth/login", formData); // bakcend creates token and sends {token, user obj}
-
-            localStorage.setItem("token", res.data.token);
+            
+            //store name (for displaying) and token keys separately
+            const { token, user } = res.data;
+            localStorage.setItem("token", token);
+            localStorage.setItem("user", JSON.stringify(user));
+            //lc stores only strings
 
             navigate("/home");
         } catch (err) {

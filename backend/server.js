@@ -8,8 +8,9 @@ import { Server } from "socket.io";
 
 import checkWinner from "./services/winnerCheck.js";
 import {createGame} from "./services/createGame.js";
-import { players } from "./data/players.js";
-import { startTimer } from "./services/timer.js";
+import {startTimer,startGlobalTimer } from "./services/TimerManager.js";
+import { generateBoard, validateAnswerByGemini } from "./services/gemini.js";
+
 
 
 dotenv.config();
@@ -17,6 +18,12 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+console.time("Generate Board");
+const board = await generateBoard();
+console.timeEnd("Generate Board");
+
+console.log(board);
 
 //routes
 app.use("/auth", userRoutes);
@@ -30,36 +37,42 @@ const io = new Server(server, {
     },
 });
 
-const games = {}; //to store board,turns and curr game
+const games = {};//key=roomId,
+//1)board, 2)grid(by gemini), 3)turn, 4)players=[you,opponent]
+//5 timer
 const queue=[];
 const usedPlayers=[];
 
 //main connecton fn
 // all other socket events only after conn happens/inside it
 io.on("connection", (socket) => {
-
+   
     //**data=room=roomId
-    socket.on("join_room",(data)=>{
+    socket.on("join_room",async (data,user)=>{
          
-        const checkData = io.sockets.adapter.rooms.get(data);
+        const checkData = io.sockets.adapter.rooms.get(data);//returns a set
         
         if (checkData && checkData.size >= 2){
              socket.emit("room_full");
              return;
         }
-        
+        socket.user=user;
         socket.join(data);
         //games[room].players.push(socket.id);
         const roomData = io.sockets.adapter.rooms.get(data); //returns a set
         
         if(roomData.size===2){
-          const players = [...roomData];
-            createGame(
+             const players = [...roomData];
+             
+             const player1 = io.sockets.sockets.get(players[0]);
+             const player2 = io.sockets.sockets.get(players[1]);
+             
+             await createGame(
                 io,
                 games,
                 data,
-                { id: players[0] },
-                { id: players[1] }
+                player1,
+                player2
             );
             
         }
@@ -67,97 +80,111 @@ io.on("connection", (socket) => {
         console.log(`there are ${roomData.size} users`);
 })
 
-//game/Validate Answers && Winner Check too-------------------------------
+//-----game/Validate Answers && Winner Check too-------------------------------
 
-    socket.on("submit_answer", (data) => {
+    socket.on("submit_answer", async (data) => {
 
     const game = games[data.room];
     if (!game) return;
-    
-    //dont let overwrite (no steals yet)
-    if (game.board[data.index] !== "") {
-    socket.emit("answer_result", {
-        correct: false,
-        message: "Cell already occupied."
-    });
-    return;
-}
-    
-    //check if curr player 
+    //after adding global timer
+    if (game.gameOver) return;
+
+    if (game.globalTimeLeft <= 0) return;
+
+//************Don't allow overwriting
+    /**
+     if (game.board[data.index] !== "") {
+        socket.emit("answer_result", {
+            correct: false,
+            message: "Cell already occupied."
+        });
+        return;
+    }
+     * 
+     */
+//********************* */
+
+    // Check if current player
     const currentPlayer = game.players.find(
         p => p.socketId === socket.id
     );
+
     if (!currentPlayer) return;
-    
+
+    // Check turn
     if (currentPlayer.symbol !== game.turn) {
+        socket.emit("answer_result", {
+            correct: false,
+            message: "Not your turn."
+        });
+        return;
+    }
 
-    socket.emit("answer_result", {
-        correct: false,
-        message: "Not your turn."
-    });
-
-    return;
-}
-    
-
-    //game validation
     const row = Math.floor(data.index / 3);
     const col = data.index % 3;
 
     const rowRequirement = game.grid.rows[row];
     const colRequirement = game.grid.cols[col];
 
-    const player = players.find(
-        p => p.name.toLowerCase() === data.answer.toLowerCase()
+    // Check duplicate player
+    if (!data.answer) {
+    socket.emit("answer_result", {
+        correct: false,
+        message: "Please enter a player name."
+    });
+    return;
+}
+    if (game.usedPlayers.has(data.answer.toLowerCase())) {
+        socket.emit("answer_result", {
+            correct: false,
+            message: "Player already used."
+        });
+        return;
+    }
+//---------send answer check----------
+    let result;
+    try {
+    result = await validateAnswerByGemini(
+        data.answer,
+        rowRequirement, //realMadrid
+        colRequirement  //France
     );
 
-    if (!player) {
-        console.log("Player not found");
-        socket.emit("answer_result", {
+    console.log(result);
+
+} catch (err) {
+    console.error("Gemini Error:", err);
+
+    socket.emit("answer_result", {
         correct: false,
-        message: "Unknown footballer"
-        });
-        return;
-    }
-    if(usedPlayers.find(p=>p===player)){
-        console.log("Player Already Used");
-        socket.emit("answer_result", {
-        correct: false,
-        message: "Player Already Used"
-        });
-        return;
-    }
+        message: "Couldn't validate answer."
+    });
 
-    const satisfiesRow =
-        player.clubs.includes(rowRequirement) ||
-        player.countries.includes(rowRequirement) ||
-        player.competitions.includes(rowRequirement);
-
-    const satisfiesCol =
-        player.clubs.includes(colRequirement) ||
-        player.countries.includes(colRequirement) ||
-        player.competitions.includes(colRequirement);
-
-    if (satisfiesRow && satisfiesCol) {
-        usedPlayers.push(player);
+    return;
+}
+//---------------------------------------
+//--------update board if valid result
+    
+    if(result.valid) {
+        game.usedPlayers.add(data.answer.toLowerCase());
         
         game.board[data.index] = currentPlayer.symbol;
-
-        //after filling table check winner
         const winner = checkWinner(game.board);
+
         if (winner) {
             io.to(data.room).emit("winner", winner);
             clearInterval(game.timer);
             delete games[data.room];
             return;
-        } 
+        }
 
-//----------Restart timer after a correct answer
+        //Restart timer after a correct answer
         clearInterval(game.timer);
         game.turn =game.turn === "X" ? "O" : "X";
         startTimer(io, games, data.room);
         //
-        
+
+//---------Update board after resetting timer------------
         io.to(data.room).emit("board_update", {
             board: game.board,
             answers: game.answers,
@@ -178,19 +205,21 @@ io.on("connection", (socket) => {
 
 
 //------------randomMatchmaking Logic---------------
-socket.on("find_match",()=>{
+socket.on("find_match",async(user)=>{
     
+    socket.user=user;
     queue.push(socket);
     
+    //console.log(user);
     if(queue.length>=2){
         const player1 = queue.shift(); //socket objs
         const player2 = queue.shift();
         
-        const room = "room-" + Date.now();//create room
+        const room =Date.now();//create random room
          player1.join(room);
          player2.join(room);    
         
-         createGame(
+         await createGame(
              io,
              games,
              room,
@@ -212,6 +241,14 @@ socket.on("find_match",()=>{
     } else {
         socket.emit("game_not_found");
     }
+    socket.emit("board_update", {
+        board: games[room].board,
+        answers: games[room].answers,
+        turn: games[room].turn
+    });
+
+    socket.emit("turn_timer_update", games[room].turnTimeLeft);
+    socket.emit("global_timer_update", games[room].globalTimeLeft);
 });
 
 
@@ -249,10 +286,7 @@ socket.on("find_match",()=>{
 });
 
 });
-
-
-//socket io
-
+//socket io-----ends
 
 mongoose.connect(process.env.MONGO_URI)
     .then(() => {

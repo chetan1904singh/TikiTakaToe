@@ -7,13 +7,16 @@ function Matchmaking(){
     const navigate = useNavigate();
     const location = useLocation();
     const room = location.state?.room;
+    const user = JSON.parse(localStorage.getItem("user"));
+    //user is an obj**
+    
 
     useEffect(() => {
 
     if (room) {
-        socket.emit("join_room", room);
+        socket.emit("join_room", room,user);
     } else {
-        socket.emit("find_match");
+        socket.emit("find_match",user);
     }
 
     socket.on("room_full", () => {
@@ -23,6 +26,7 @@ function Matchmaking(){
 
     socket.on("game_start", (game) => {
         console.log("GAME START RECEIVED", game);
+        console.log(game.players);
          navigate("/game", {state: game});
     });
 
