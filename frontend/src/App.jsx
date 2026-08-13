@@ -5,7 +5,7 @@ import Signup from "./pages/Signup";
 import Home from "./pages/Home";
 import Game from "./pages/Game";
 import Result from "./pages/Result";
-import Matchmaking from "./pages/matchmaking";
+import Matchmaking from "./pages/Matchmaking";
 
 function App() {
     return (
